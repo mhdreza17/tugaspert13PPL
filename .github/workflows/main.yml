@@ -31,6 +31,17 @@ jobs:
       - name: Wait for Selenium Hub
         run: sh wait.sh
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Selenium
+        run: pip install selenium
+
+      - name: Run test script
+        run: python tests/hello_example.py
+
       - name: Check the Hub
         run: curl http://localhost:4444/ui
 
