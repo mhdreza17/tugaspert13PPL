@@ -19,15 +19,13 @@ class AutTest(unittest.TestCase):
         if len(sys.argv) > 1:
             url = sys.argv[1]
         else:
-            url = "http://localhost:8080"
+            url = "http://docker-apache"
 
-        try:
-            self.browser.get(url)
-        except Exception as e:
-            print(f"Initial connection failed: {e}")
-            # Retry once more with a delay
-            time.sleep(2)
-            self.browser.get(url)
+        # Ensure proper URL format
+        if not url.startswith('http'):
+            url = "http://" + url
+
+        self.browser.get(url)
         expected_result = "Welcome back, Guest!"
         actual_result = self.browser.find_element(By.TAG_NAME, 'p').text
         self.assertIn(expected_result, actual_result)

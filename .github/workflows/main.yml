@@ -56,7 +56,7 @@ jobs:
         run: pip install selenium
 
       - name: Run test
-        run: python tests/hello_aut.py http://localhost:8080
+        run: python tests/hello_aut.py http://docker-apache
 
       - name: Check the Hub
         run: curl http://localhost:4444/ui
