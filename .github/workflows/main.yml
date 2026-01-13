@@ -58,8 +58,11 @@ jobs:
       - name: Run test
         run: python tests/hello_aut.py http://docker-apache
 
-      - name: Check the Hub
-        run: curl http://localhost:4444/ui
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Screenshot
+          path: screenshot.png
 
       - name: Stop docker
         if: always()
