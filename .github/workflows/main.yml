@@ -28,8 +28,24 @@ jobs:
       - name: Selenium Preparation
         run: docker run --network=isolated -d -p 4444:4444 -p 7900:7900 -v /dev/shm:/dev/shm --name firefox-standalone selenium/standalone-firefox:latest
 
-      - name: Wait for Selenium Hub
-        run: sh wait.sh
+      - name: Wait for Selenium Hub and AUT
+        run: |
+          echo "Waiting for Selenium Hub..."
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:4444/wd/hub/status | grep -q "ready"; then
+              echo "Selenium Hub is ready!"
+              break
+            fi
+            sleep 1
+          done
+          echo "Waiting for AUT..."
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:8080 > /dev/null 2>&1; then
+              echo "AUT is ready!"
+              break
+            fi
+            sleep 1
+          done
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -40,7 +56,7 @@ jobs:
         run: pip install selenium
 
       - name: Run test
-        run: python tests/hello_aut.py ${{ env.URL }}
+        run: python tests/hello_aut.py http://localhost:8080
 
       - name: Check the Hub
         run: curl http://localhost:4444/ui

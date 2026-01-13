@@ -1,5 +1,6 @@
 import unittest
 import sys
+import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
@@ -18,9 +19,15 @@ class AutTest(unittest.TestCase):
         if len(sys.argv) > 1:
             url = sys.argv[1]
         else:
-            url = "http://localhost"
+            url = "http://localhost:8080"
 
-        self.browser.get(url)
+        try:
+            self.browser.get(url)
+        except Exception as e:
+            print(f"Initial connection failed: {e}")
+            # Retry once more with a delay
+            time.sleep(2)
+            self.browser.get(url)
         expected_result = "Welcome back, Guest!"
         actual_result = self.browser.find_element(By.TAG_NAME, 'p').text
         self.assertIn(expected_result, actual_result)
