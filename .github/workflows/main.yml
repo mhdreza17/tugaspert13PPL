@@ -1,41 +1,57 @@
+name: OTE Testing
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
 jobs:
   test:
     runs-on: ubuntu-latest
-
     strategy:
-      fail-fast: false
       matrix:
         browser: [firefox, chrome, edge]
-
-    env:
-      URL: http://localhost:8080
+      max-parallel: 3
 
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
 
       - name: Create isolated network
-        run: docker network create --driver bridge isolated
+        run: docker network create --driver bridge isolated-${{ matrix.browser }}
 
       - name: Build AUT image
         run: docker build -t my-php-site:latest .
 
       - name: Run AUT container
-        run: docker run -d --network=isolated -p 8080:80 --name docker-apache my-php-site:latest
+        run: docker run -d --network=isolated-${{ matrix.browser }} -p 808${{ matrix.browser == 'firefox' && '0' || matrix.browser == 'chrome' && '1' || '2' }}:80 --name docker-apache-${{ matrix.browser }} my-php-site:latest
 
       - name: Check AUT Url
-        run: curl -i ${{ env.URL }} | head -n 10
+        run: curl -i http://localhost:808${{ matrix.browser == 'firefox' && '0' || matrix.browser == 'chrome' && '1' || '2' }} | head -n 30
 
-      - name: Run Selenium (${{ matrix.browser }})
+      - name: Selenium Preparation
+        run: docker run --network=isolated-${{ matrix.browser }} -d -p 444${{ matrix.browser == 'firefox' && '4' || matrix.browser == 'chrome' && '5' || '6' }}:4444 -p 790${{ matrix.browser == 'firefox' && '0' || matrix.browser == 'chrome' && '1' || '2' }}:7900 -v /dev/shm:/dev/shm --name ${{ matrix.browser }}-standalone selenium/standalone-${{ matrix.browser }}:latest
+
+      - name: Wait for Selenium Hub and AUT
         run: |
-          docker run --network=isolated -d \
-          -p 4444:4444 -p 7900:7900 \
-          -v /dev/shm:/dev/shm \
-          --name selenium-${{ matrix.browser }} \
-          selenium/standalone-${{ matrix.browser }}:latest
-
-      - name: Wait for Selenium Hub
-        run: sh wait.sh
+          PORT=808${{ matrix.browser == 'firefox' && '0' || matrix.browser == 'chrome' && '1' || '2' }}
+          SELENIUM_PORT=444${{ matrix.browser == 'firefox' && '4' || matrix.browser == 'chrome' && '5' || '6' }}
+          echo "Waiting for Selenium Hub..."
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:$SELENIUM_PORT/wd/hub/status | grep -q "ready"; then
+              echo "Selenium Hub is ready!"
+              break
+            fi
+            sleep 1
+          done
+          echo "Waiting for AUT..."
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:$PORT > /dev/null 2>&1; then
+              echo "AUT is ready!"
+              break
+            fi
+            sleep 1
+          done
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -43,15 +59,20 @@ jobs:
           python-version: "3.11"
 
       - name: Install Selenium
-        run: pip install -U selenium
+        run: pip install selenium
 
       - name: Run test
-        env:
-          BROWSER: ${{ matrix.browser }}
-        run: python tests/hello_aut.py ${{ env.URL }}
+        run: python tests/hello_aut.py http://docker-apache-${{ matrix.browser }} ${{ matrix.browser }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Screenshot-${{ matrix.browser }}
+          path: screenshot.png
 
       - name: Stop docker
         if: always()
         run: |
-          docker stop selenium-${{ matrix.browser }} || true
-          docker stop docker-apache || true
+          docker stop ${{ matrix.browser }}-standalone || true
+          docker stop docker-apache-${{ matrix.browser }} || true
+          docker network remove isolated-${{ matrix.browser }} || true
