@@ -35,15 +35,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+     
+      - name: Check the Hub
+        run: curl http://localhost:4444/ui
 
       - name: Install Selenium
         run: pip install selenium
 
-      - name: Run test script
-        run: python tests/hello_example.py
-
-      - name: Check the Hub
-        run: curl http://localhost:4444/ui
+      - name: Run test
+        run: python tests/hello_aut.py ${{ env.URL }}
 
       - name: Stop docker
         if: always()
