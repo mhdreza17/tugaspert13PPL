@@ -1,0 +1,30 @@
+name: OTE Testing
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+
+      - name: Create isolated network
+        run: docker network create --driver bridge isolated
+
+      - name: Build AUT image
+        run: docker build -t my-php-site:latest .
+
+      - name: Run AUT container
+        run: docker run -d --network=isolated -p 8080:80 --name docker-apache my-php-site:latest
+
+      - name: Check AUT Url
+        run: curl -i http://localhost:8080 | head -n 30
+
+      - name: Stop docker
+        if: always()
+        run: docker stop docker-apache
