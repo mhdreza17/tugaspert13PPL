@@ -1,13 +1,14 @@
-name: OTE Testing
-
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
-
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, chrome, edge]
+
+    env:
+      URL: http://localhost:8080
 
     steps:
       - name: Checkout the repo
@@ -23,29 +24,18 @@ jobs:
         run: docker run -d --network=isolated -p 8080:80 --name docker-apache my-php-site:latest
 
       - name: Check AUT Url
-        run: curl -i http://localhost:8080 | head -n 30
+        run: curl -i ${{ env.URL }} | head -n 10
 
-      - name: Selenium Preparation
-        run: docker run --network=isolated -d -p 4444:4444 -p 7900:7900 -v /dev/shm:/dev/shm --name firefox-standalone selenium/standalone-firefox:latest
-
-      - name: Wait for Selenium Hub and AUT
+      - name: Run Selenium (${{ matrix.browser }})
         run: |
-          echo "Waiting for Selenium Hub..."
-          for i in $(seq 1 60); do
-            if curl -s http://localhost:4444/wd/hub/status | grep -q "ready"; then
-              echo "Selenium Hub is ready!"
-              break
-            fi
-            sleep 1
-          done
-          echo "Waiting for AUT..."
-          for i in $(seq 1 60); do
-            if curl -s http://localhost:8080 > /dev/null 2>&1; then
-              echo "AUT is ready!"
-              break
-            fi
-            sleep 1
-          done
+          docker run --network=isolated -d \
+          -p 4444:4444 -p 7900:7900 \
+          -v /dev/shm:/dev/shm \
+          --name selenium-${{ matrix.browser }} \
+          selenium/standalone-${{ matrix.browser }}:latest
+
+      - name: Wait for Selenium Hub
+        run: sh wait.sh
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -53,19 +43,15 @@ jobs:
           python-version: "3.11"
 
       - name: Install Selenium
-        run: pip install selenium
+        run: pip install -U selenium
 
       - name: Run test
-        run: python tests/hello_aut.py http://docker-apache
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Screenshot
-          path: screenshot.png
+        env:
+          BROWSER: ${{ matrix.browser }}
+        run: python tests/hello_aut.py ${{ env.URL }}
 
       - name: Stop docker
         if: always()
         run: |
-          docker stop firefox-standalone || true
+          docker stop selenium-${{ matrix.browser }} || true
           docker stop docker-apache || true
