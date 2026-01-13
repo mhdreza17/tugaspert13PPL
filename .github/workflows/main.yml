@@ -9,6 +9,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      URL: http://localhost:8080
+      SELENIUM_URL: http://localhost:4444
+
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v4
@@ -23,7 +27,7 @@ jobs:
         run: docker run -d --network=isolated -p 8080:80 --name docker-apache my-php-site:latest
 
       - name: Check AUT Url
-        run: curl -i http://localhost:8080 | head -n 30
+        run: curl -i ${{ env.URL }} | head -n 30
 
       - name: Selenium Preparation
         run: docker run --network=isolated -d -p 4444:4444 -p 7900:7900 -v /dev/shm:/dev/shm --name firefox-standalone selenium/standalone-firefox:latest
@@ -31,16 +35,16 @@ jobs:
       - name: Wait for Selenium Hub
         run: sh wait.sh
 
+      - name: Check the Hub
+        run: curl http://localhost:4444/ui
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-     
-      - name: Check the Hub
-        run: curl http://localhost:4444/ui
 
       - name: Install Selenium
-        run: pip install selenium
+        run: pip install -U selenium
 
       - name: Run test
         run: python tests/hello_aut.py ${{ env.URL }}
